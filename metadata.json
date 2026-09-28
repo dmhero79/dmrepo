@@ -1,0 +1,6 @@
+{
+  "name": "AutoDM — Social Commerce CRM & Instagram Automation",
+  "description": "All-in-one Social Commerce CRM for creators: Instagram comment-to-DM keyword automation, custom storefronts, zero-commission checkout, and customer CRM for $5/month.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
