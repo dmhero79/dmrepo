@@ -49,6 +49,50 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
   const [simulationResult, setSimulationResult] = useState<any>(null);
   const [testCommentKeyword, setTestCommentKeyword] = useState('BUY');
 
+  // Backend host config for deployments (e.g. GitHub Pages static vs Render/Node backend)
+  const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+  const defaultApiUrl = ((import.meta as any).env?.VITE_API_URL as string) || '';
+  const [customBackendUrl, setCustomBackendUrl] = useState(() => {
+    return localStorage.getItem('autodm_backend_url') || defaultApiUrl || '';
+  });
+  const [backendInputVal, setBackendInputVal] = useState(() => customBackendUrl);
+  const [showBackendSetupGuide, setShowBackendSetupGuide] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<string | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+
+  const activeBaseUrl = customBackendUrl.trim() 
+    ? customBackendUrl.trim().replace(/\/+$/, '') 
+    : (typeof window !== 'undefined' ? window.location.origin : '');
+
+  const webhookCallbackUrl = `${activeBaseUrl}/webhook`;
+
+  const handleSaveBackendUrl = (val: string) => {
+    const cleaned = val.trim().replace(/\/+$/, '');
+    setCustomBackendUrl(cleaned);
+    localStorage.setItem('autodm_backend_url', cleaned);
+    setHealthStatus(null);
+  };
+
+  const handleCheckBackendHealth = async (urlToCheck?: string) => {
+    const target = (urlToCheck || activeBaseUrl).replace(/\/+$/, '');
+    if (!target) return;
+    setCheckingHealth(true);
+    setHealthStatus(null);
+    try {
+      const res = await fetch(`${target}/health`);
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        setHealthStatus('✅ Reachable! Backend is online and returned {"status": "ok"}');
+      } else {
+        setHealthStatus(`⚠️ Responded with status ${res.status}: ${JSON.stringify(data)}`);
+      }
+    } catch (err: any) {
+      setHealthStatus(`❌ Unreachable (${err.message}). Make sure the backend server is running with public HTTPS.`);
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+
   // Connection form state
   const [formHandle, setFormHandle] = useState('');
   const [formAccountName, setFormAccountName] = useState('');
@@ -59,13 +103,13 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
     async function loadLiveInstagram() {
       setLoadingLive(true);
       try {
-        const accRes = await fetch('/api/instagram/account');
+        const accRes = await fetch(`${activeBaseUrl}/api/instagram/account`);
         const accData = await accRes.json();
         if (accData.success) {
           setLiveAccount(accData.account);
         }
 
-        const postsRes = await fetch('/api/instagram/posts');
+        const postsRes = await fetch(`${activeBaseUrl}/api/instagram/posts`);
         const postsData = await postsRes.json();
         if (postsData.success && Array.isArray(postsData.posts)) {
           setLivePosts(postsData.posts);
@@ -78,17 +122,19 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
     }
 
     loadLiveInstagram();
-  }, []);
+  }, [activeBaseUrl]);
 
   const handleTestWebhookHandshake = async () => {
     setTestingWebhookId('handshake');
     try {
-      const res = await fetch('/api/webhook/instagram?hub.mode=subscribe&hub.challenge=test_meta_challenge_779&hub.verify_token=autodm_meta_verify_token_2026');
+      const res = await fetch(`${activeBaseUrl}/webhook?hub.mode=subscribe&hub.challenge=test_meta_challenge_779&hub.verify_token=autodm_meta_verify_token_2026`);
       const text = await res.text();
       if (res.ok && text.includes('test_meta_challenge_779')) {
         setTestChallengeResult('200 OK — Challenge Accepted! Meta Webhook handshake is fully operational.');
+      } else if (res.status === 404 && isGitHubPages && !customBackendUrl) {
+        setTestChallengeResult('404 Not Found: GitHub Pages only hosts static files and cannot run Node.js/Express backend APIs. Connect a free backend (like Render, Railway, or localtunnel) below!');
       } else {
-        setTestChallengeResult(`Response (${res.status}): ${text.slice(0, 120)}`);
+        setTestChallengeResult(`Response (${res.status}): ${text.slice(0, 140)}`);
       }
     } catch (e: any) {
       setTestChallengeResult(`Handshake error: ${e.message}`);
@@ -101,7 +147,7 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
     setSimulatingComment(true);
     setSimulationResult(null);
     try {
-      const res = await fetch('/api/webhook/simulate', {
+      const res = await fetch(`${activeBaseUrl}/api/webhook/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -339,16 +385,123 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
           </div>
         )}
 
+        {/* GitHub Pages Notice & Backend API Connection */}
+        {isGitHubPages && !customBackendUrl && (
+          <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-200 text-xs text-amber-900 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h5 className="font-extrabold text-amber-950 text-sm">
+                    GitHub Pages is Static Hosting Only
+                  </h5>
+                  <p className="text-amber-800 text-xs mt-0.5 leading-relaxed">
+                    GitHub Pages (<code>dmhero79.github.io</code>) can only host frontend HTML &amp; JS. It returns <strong>404 Not Found</strong> for backend API endpoints like <code>/api/webhook/instagram</code>.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBackendSetupGuide(!showBackendSetupGuide)}
+                className="px-2.5 py-1 text-[11px] font-bold bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg cursor-pointer shrink-0"
+              >
+                {showBackendSetupGuide ? 'Hide Guide' : 'How to Fix (2 min)'}
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <label className="text-[11px] font-bold text-amber-950 shrink-0">
+                Connect Backend API URL:
+              </label>
+              <input
+                type="url"
+                placeholder="e.g. https://my-autodm.onrender.com or https://loca.lt url"
+                value={backendInputVal}
+                onChange={(e) => setBackendInputVal(e.target.value)}
+                className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+              />
+              <button
+                onClick={() => handleSaveBackendUrl(backendInputVal)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-700 hover:bg-amber-800 text-white cursor-pointer shrink-0"
+              >
+                Save Backend URL
+              </button>
+              <button
+                onClick={() => handleCheckBackendHealth(backendInputVal)}
+                disabled={checkingHealth}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer shrink-0 flex items-center gap-1"
+              >
+                {checkingHealth ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Test /health</span>
+              </button>
+            </div>
+            {healthStatus && (
+              <div className="p-2 rounded-lg bg-amber-100 text-amber-950 font-mono text-[11px] border border-amber-300">
+                {healthStatus}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Backend Setup Guide Dropdown */}
+        {showBackendSetupGuide && (
+          <div className="p-4 rounded-xl bg-slate-900 text-slate-100 text-xs space-y-3 font-sans border border-slate-700 animate-in fade-in duration-200">
+            <h5 className="font-bold text-amber-400 text-sm flex items-center gap-2">
+              <span>🔥 Firebase + GitHub Webhook Hosting (No Render.com needed!)</span>
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3 bg-slate-800 rounded-lg space-y-1.5 border border-slate-700">
+                <span className="font-bold text-amber-400 block text-xs">
+                  Option A: Firebase Cloud Functions (Recommended)
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  Your Firebase Project <code>gen-lang-client-0580617321</code> has been provisioned. Run in your terminal:
+                </p>
+                <div className="bg-slate-950 p-2 rounded font-mono text-[11px] text-amber-300">
+                  firebase deploy --only functions
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Your persistent Meta Webhook URL:
+                </p>
+                <div className="bg-slate-950 p-2 rounded font-mono text-[10px] text-emerald-400 break-all select-all">
+                  https://us-central1-gen-lang-client-0580617321.cloudfunctions.net/webhook
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-800 rounded-lg space-y-1.5 border border-slate-700">
+                <span className="font-bold text-indigo-400 block text-xs">
+                  Option B: Instant Local Testing (Localtunnel / ngrok)
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  While running locally on your laptop:
+                </p>
+                <div className="bg-slate-950 p-2 rounded font-mono text-[11px] text-indigo-300">
+                  npx localtunnel --port 3000
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Gives you an instant temporary public HTTPS URL to test Meta webhook handshakes directly from your computer!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Webhook Configuration URLs for Meta Developer Portal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-              1. Webhook Callback URL
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                1. Webhook Callback URL
+              </span>
+              {customBackendUrl && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700">
+                  Custom Backend Active
+                </span>
+              )}
+            </div>
             <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[11px] text-slate-800">
-              <span className="truncate">{window.location.origin}/api/webhook/instagram</span>
+              <span className="truncate">{webhookCallbackUrl}</span>
               <button
-                onClick={() => handleCopyWebhook('cb-url', `${window.location.origin}/api/webhook/instagram`)}
+                onClick={() => handleCopyWebhook('cb-url', webhookCallbackUrl)}
                 className="text-indigo-600 hover:text-indigo-800 font-semibold text-xs shrink-0 cursor-pointer"
               >
                 {copiedUrlId === 'cb-url' ? '✓' : 'Copy'}

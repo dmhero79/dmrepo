@@ -1,0 +1,124 @@
+{
+  "entities": {
+    "AutomationRule": {
+      "title": "Automation Rule",
+      "description": "Auto-DM keyword automation rule",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique rule identifier",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Rule display name",
+          "maxLength": 100
+        },
+        "keyword": {
+          "type": "string",
+          "description": "Trigger keyword in uppercase",
+          "maxLength": 50
+        },
+        "actionType": {
+          "type": "string",
+          "description": "Action type for automation",
+          "enum": ["send_dm", "reply_comment", "send_product"]
+        },
+        "replyMessage": {
+          "type": "string",
+          "description": "Auto-response message text",
+          "maxLength": 1000
+        },
+        "productLink": {
+          "type": "string",
+          "description": "Optional store or product URL",
+          "maxLength": 500
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether this automation is active"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "name", "keyword", "actionType", "replyMessage", "isActive"]
+    },
+    "WebhookLog": {
+      "title": "Webhook Log",
+      "description": "Real-time webhook and DM event log",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique log identifier",
+          "maxLength": 128
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Event ISO timestamp",
+          "maxLength": 64
+        },
+        "source": {
+          "type": "string",
+          "description": "Origin of event",
+          "enum": ["webhook_real", "webhook_simulated", "api_dispatch"]
+        },
+        "type": {
+          "type": "string",
+          "description": "Event type",
+          "enum": ["comment", "message", "mention", "dm_sent", "error"]
+        },
+        "senderUsername": {
+          "type": "string",
+          "description": "Username of sender or commenter",
+          "maxLength": 100
+        },
+        "commentId": {
+          "type": "string",
+          "description": "Instagram comment ID",
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "description": "Comment or message body",
+          "maxLength": 1000
+        },
+        "triggeredKeyword": {
+          "type": "string",
+          "description": "Keyword that matched",
+          "maxLength": 50
+        },
+        "actionTaken": {
+          "type": "string",
+          "description": "Action performed description",
+          "maxLength": 200
+        },
+        "status": {
+          "type": "string",
+          "description": "Delivery status",
+          "enum": ["delivered", "received", "failed", "ignored"]
+        }
+      },
+      "required": ["id", "timestamp", "source", "type", "senderUsername", "text", "status"]
+    }
+  },
+  "firestore": {
+    "/automations/{ruleId}": {
+      "schema": "AutomationRule",
+      "description": "Active keyword automation rules"
+    },
+    "/webhookLogs/{logId}": {
+      "schema": "WebhookLog",
+      "description": "Logs of webhook events and DM actions"
+    }
+  }
+}

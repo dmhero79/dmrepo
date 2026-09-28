@@ -12,11 +12,12 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
-// Instagram / Meta Credentials
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || 'IGAAPl048uu5RBZAGE3WEZAEVXdUTVNyeXdULVh1YUZAIRGo2aXlMbG1fY0FuMHl1OFZAxdTBmN2lQVkVfeF9XaWNDR2ZARV3d6ZAVVvYmUtUk5wbmNIRnpDOE9GVXBEdnczelVmN2VfV3JrSlFuMkM1RDN4TkhQSU5uTUJqNkZAyNE55VQZDZD';
-const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || '1097121733196692';
-const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '874fd11ffd94c7c6ca4853791977e4e3';
-const INSTAGRAM_WEBHOOK_VERIFY_TOKEN = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN || 'autodm_meta_verify_token_2026';
+// Instagram / Meta Credentials (loaded securely from environment variables)
+const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '';
+const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '';
+const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || '';
+const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN || 'autodm_meta_verify_token_2026';
+const INSTAGRAM_WEBHOOK_VERIFY_TOKEN = WEBHOOK_VERIFY_TOKEN;
 
 // In-memory logs of real and simulated webhook events and DM dispatches
 interface WebhookEventLog {
@@ -89,9 +90,27 @@ let activeAutomations: AutomationRule[] = [
   }
 ];
 
-// Middleware
+// Middleware & CORS
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ==============================================================
+// 0. HEALTH CHECK ENDPOINT (GET /health)
+// ==============================================================
+// Used to verify that backend is running and reachable
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // ==============================================================
 // 1. INSTAGRAM GRAPH API STATUS & ACCOUNT ENDPOINT
@@ -232,10 +251,10 @@ app.post('/api/instagram/send-dm', async (req: Request, res: Response) => {
 });
 
 // ==============================================================
-// 4. META WEBHOOK VERIFICATION (GET /api/webhook/instagram)
+// 4. META WEBHOOK VERIFICATION (GET /webhook & GET /api/webhook/instagram)
 // ==============================================================
 // Meta calls this when configuring the Webhook callback in Meta App Dashboard
-app.get('/api/webhook/instagram', (req: Request, res: Response) => {
+const handleWebhookVerification = (req: Request, res: Response) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'] as string | undefined;
   const challenge = req.query['hub.challenge'];
@@ -243,9 +262,9 @@ app.get('/api/webhook/instagram', (req: Request, res: Response) => {
   console.log(`[Meta Webhook Verification] mode=${mode}, token=${token}`);
 
   const validTokens = [
-    'autodm_meta_verify_token_2026',
-    'IGAAPl048uu5RBZAGE3WEZAEVXdUTVNyeXdULVh1YUZAIRGo2aXlMbG1fY0FuMHl1OFZAxdTBmN2lQVkVfeF9XaWNDR2ZARV3d6ZAVVvYmUtUk5wbmNIRnpDOE9GVXBEdnczelVmN2VfV3JrSlFuMkM1RDN4TkhQSU5uTUJqNkZAyNE55VQZDZD',
+    process.env.WEBHOOK_VERIFY_TOKEN,
     process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
+    'autodm_meta_verify_token_2026',
   ].filter(Boolean);
 
   if (mode === 'subscribe' && token && validTokens.includes(token)) {
@@ -254,22 +273,25 @@ app.get('/api/webhook/instagram', (req: Request, res: Response) => {
     return res.status(200).send(challenge);
   }
 
-  // Also support lenient mode if mode is subscribe and challenge is provided
-  if (mode === 'subscribe' && challenge) {
-    console.log('[Meta Webhook Verification] Lenient match on subscribe challenge:', challenge);
+  // Also support subscribe if challenge is present and token matches configured verify token
+  if (mode === 'subscribe' && token && token === WEBHOOK_VERIFY_TOKEN) {
+    console.log('[Meta Webhook Verification] SUCCESS with WEBHOOK_VERIFY_TOKEN! Challenge:', challenge);
     res.setHeader('Content-Type', 'text/plain');
     return res.status(200).send(challenge);
   }
 
   console.warn('[Meta Webhook Verification] FAILED! Verify token mismatch. Got:', token);
   return res.status(403).send('Forbidden: Verify token mismatch');
-});
+};
+
+app.get('/webhook', handleWebhookVerification);
+app.get('/api/webhook/instagram', handleWebhookVerification);
 
 // ==============================================================
-// 5. META WEBHOOK EVENT RECEIVER (POST /api/webhook/instagram)
+// 5. META WEBHOOK EVENT RECEIVER (POST /webhook & POST /api/webhook/instagram)
 // ==============================================================
 // Meta POSTs real-time events when comments or messages occur on Instagram
-app.post('/api/webhook/instagram', async (req: Request, res: Response) => {
+const handleWebhookEvent = async (req: Request, res: Response) => {
   // Always return 200 OK immediately so Meta knows the event was received
   res.status(200).send('EVENT_RECEIVED');
 
@@ -396,7 +418,10 @@ app.post('/api/webhook/instagram', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[Meta Webhook Processing Error]:', error);
   }
-});
+};
+
+app.post('/webhook', handleWebhookEvent);
+app.post('/api/webhook/instagram', handleWebhookEvent);
 
 // ==============================================================
 // 6. SIMULATE / TEST WEBHOOK EVENT DIRECTLY FROM DASHBOARD

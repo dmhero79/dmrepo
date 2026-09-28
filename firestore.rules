@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidAutomationRule(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.keyword is string && data.keyword.size() > 0 && data.keyword.size() <= 50
+        && data.actionType in ['send_dm', 'reply_comment', 'send_product']
+        && data.replyMessage is string && data.replyMessage.size() > 0 && data.replyMessage.size() <= 1000
+        && data.isActive is bool;
+    }
+
+    function isValidWebhookLog(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.source in ['webhook_real', 'webhook_simulated', 'api_dispatch']
+        && data.type in ['comment', 'message', 'mention', 'dm_sent', 'error']
+        && data.senderUsername is string && data.senderUsername.size() <= 100
+        && data.text is string && data.text.size() <= 1000
+        && data.status in ['delivered', 'received', 'failed', 'ignored'];
+    }
+
+    // Automations collection
+    match /automations/{ruleId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(ruleId) && isValidAutomationRule(request.resource.data);
+      allow delete: if isValidId(ruleId);
+    }
+
+    // Webhook event logs collection
+    match /webhookLogs/{logId} {
+      allow get, list: if true;
+      allow create: if isValidId(logId) && isValidWebhookLog(request.resource.data);
+      allow update, delete: if false;
+    }
+  }
+}
