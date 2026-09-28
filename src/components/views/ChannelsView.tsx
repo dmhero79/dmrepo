@@ -49,11 +49,19 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
   const [simulationResult, setSimulationResult] = useState<any>(null);
   const [testCommentKeyword, setTestCommentKeyword] = useState('BUY');
 
-  // Backend host config for deployments (e.g. GitHub Pages static vs Render/Node backend)
+  const FIREBASE_FUNCTIONS_URL = 'https://us-central1-gen-lang-client-0580617321.cloudfunctions.net';
+
+  // Backend host config for deployments (e.g. GitHub Pages static vs Firebase/Node backend)
   const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
   const defaultApiUrl = ((import.meta as any).env?.VITE_API_URL as string) || '';
   const [customBackendUrl, setCustomBackendUrl] = useState(() => {
-    return localStorage.getItem('autodm_backend_url') || defaultApiUrl || '';
+    const saved = localStorage.getItem('autodm_backend_url') || defaultApiUrl || '';
+    // Auto-clean if accidentally saved a github.io URL as backend
+    if (saved.includes('github.io')) {
+      localStorage.removeItem('autodm_backend_url');
+      return '';
+    }
+    return saved;
   });
   const [backendInputVal, setBackendInputVal] = useState(() => customBackendUrl);
   const [showBackendSetupGuide, setShowBackendSetupGuide] = useState(false);
@@ -68,6 +76,10 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
 
   const handleSaveBackendUrl = (val: string) => {
     const cleaned = val.trim().replace(/\/+$/, '');
+    if (cleaned.includes('github.io')) {
+      setHealthStatus('❌ github.io is your static frontend host. It cannot run APIs or handle webhooks. Please deploy your Firebase Cloud Function or use localtunnel.');
+      return;
+    }
     setCustomBackendUrl(cleaned);
     localStorage.setItem('autodm_backend_url', cleaned);
     setHealthStatus(null);
@@ -76,10 +88,19 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
   const handleCheckBackendHealth = async (urlToCheck?: string) => {
     const target = (urlToCheck || activeBaseUrl).replace(/\/+$/, '');
     if (!target) return;
+    if (target.includes('github.io')) {
+      setHealthStatus('❌ github.io is your static frontend host. It cannot respond to API health checks. Use your Firebase Cloud Function URL instead.');
+      return;
+    }
     setCheckingHealth(true);
     setHealthStatus(null);
     try {
       const res = await fetch(`${target}/health`);
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setHealthStatus(`❌ Server returned non-JSON response (${res.status}). Ensure your backend is deployed with an active /health endpoint.`);
+        return;
+      }
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
         setHealthStatus('✅ Reachable! Backend is online and returned {"status": "ok"}');
@@ -414,16 +435,25 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
               </label>
               <input
                 type="url"
-                placeholder="e.g. https://my-autodm.onrender.com or https://loca.lt url"
+                placeholder="e.g. https://us-central1-gen-lang-client-0580617321.cloudfunctions.net"
                 value={backendInputVal}
                 onChange={(e) => setBackendInputVal(e.target.value)}
                 className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
               />
               <button
+                onClick={() => {
+                  setBackendInputVal(FIREBASE_FUNCTIONS_URL);
+                  handleSaveBackendUrl(FIREBASE_FUNCTIONS_URL);
+                }}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-200 hover:bg-amber-300 text-amber-900 cursor-pointer shrink-0"
+              >
+                Use Firebase URL
+              </button>
+              <button
                 onClick={() => handleSaveBackendUrl(backendInputVal)}
                 className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-700 hover:bg-amber-800 text-white cursor-pointer shrink-0"
               >
-                Save Backend URL
+                Save
               </button>
               <button
                 onClick={() => handleCheckBackendHealth(backendInputVal)}
@@ -434,6 +464,9 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
                 <span>Test /health</span>
               </button>
             </div>
+            <p className="text-[10px] text-amber-800 italic">
+              ⚠️ <strong>Never enter a github.io URL here.</strong> GitHub Pages is a static frontend. Your backend runs on Firebase Cloud Functions.
+            </p>
             {healthStatus && (
               <div className="p-2 rounded-lg bg-amber-100 text-amber-950 font-mono text-[11px] border border-amber-300">
                 {healthStatus}
