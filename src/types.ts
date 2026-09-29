@@ -15,6 +15,31 @@ export interface ChannelCapability {
   statusNotice?: string;
 }
 
+export interface UserInstagramAccount {
+  id: string;
+  userId: string;
+  handle: string; // e.g. "mridaliniofficial" (without @)
+  displayName: string;
+  avatarUrl?: string;
+  category?: string;
+  isConnected: boolean;
+  accessToken?: string;
+  appId?: string;
+  webhookVerifyToken?: string;
+  connectedAt: string;
+  isPrimary?: boolean;
+}
+
+export interface PlatformUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  plan: 'free_starter' | 'creator_pro';
+  activeAccountId?: string;
+  createdAt: string;
+}
+
 export interface SocialChannelAccount {
   id: string;
   channel: ChannelType;

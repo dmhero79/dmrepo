@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Automation } from '../types';
 import { X, Sparkles, Instagram, Link2, Send, Check, Hash, AlertCircle } from 'lucide-react';
+import { useAuthPlatform } from '../context/AuthPlatformContext';
 
 interface CreateAutomationModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const CreateAutomationModal: React.FC<CreateAutomationModalProps> = ({
   editAutomation,
   editingAutomation,
 }) => {
+  const { activeAccount } = useAuthPlatform();
+  const currentHandle = activeAccount?.handle || 'mridaliniofficial';
   const currentAuto = editAutomation || editingAutomation;
   const [name, setName] = useState(currentAuto?.name || '');
   const [postCode, setPostCode] = useState(currentAuto?.postCode || '#cKcJ39');
@@ -29,12 +32,9 @@ export const CreateAutomationModal: React.FC<CreateAutomationModalProps> = ({
     'Hey! Here’s the link:\nhttps://yourlink.com/details\n\nLet me know if you have questions! 😊'
   );
   const [postThumbnail, setPostThumbnail] = useState(
-    currentAuto?.postThumbnail || '/src/assets/images/post_course_launch_1790498703738.jpg'
+    currentAuto?.postThumbnail || 'https://scontent-tpe1-1.cdninstagram.com/v/t51.71878-15/758400594_1074641168558022_1484593028835977962_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=106&ccb=7-5&_nc_sid=a54f6b&efg=eyJlZmdfdGFnIjoiYmVzdF9pbWFnZV91cmxnZW4uQ0xJUFMuQzMifQ%3D%3D&_nc_ohc=HVabN2FWD9oQ7kNvwFM9FBh&_nc_oc=AdoP2Bf2hCiK3OAEETclYPi9L9VgUDxABn71tcLNI0MORMe1y1HOucbGZiNFCAABwHgqnL4umtwQvnzhrNFuOo1c&_nc_zt=23&_nc_ht=scontent-tpe1-1.cdninstagram.com&edm=ANo9K5cEAAAA&_nc_gid=QtKzGqASPYGF0NL_5VfPVA&_nc_tpa=Q5bMBQLk8FizTLNX151tK6mV209F174oTBZUa2rPNQc4Hn82y_MIhwf4FvvS5LLXgF8eSfd7z28Gxuvjrg&oh=00_AQOm2l9bXA6nStQi0kisLsse273EDDqCS5zrbE2spawy_A&oe=6AC085D9'
   );
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
-
   const [livePosts, setLivePosts] = useState<any[]>([]);
 
   React.useEffect(() => {
@@ -51,6 +51,25 @@ export const CreateAutomationModal: React.FC<CreateAutomationModalProps> = ({
     }
     loadPosts();
   }, []);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(currentAuto?.name || '');
+      setPostCode(currentAuto?.postCode || '#cKcJ39');
+      setKeyword(currentAuto?.keyword || currentAuto?.keywords?.[0] || '');
+      setDmMessage(
+        currentAuto?.replyMessage ||
+        currentAuto?.dmMessage ||
+        'Hey! Here’s the link:\nhttps://yourlink.com/details\n\nLet me know if you have questions! 😊'
+      );
+      setPostThumbnail(
+        currentAuto?.postThumbnail || 'https://scontent-tpe1-1.cdninstagram.com/v/t51.71878-15/758400594_1074641168558022_1484593028835977962_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=106&ccb=7-5&_nc_sid=a54f6b&efg=eyJlZmdfdGFnIjoiYmVzdF9pbWFnZV91cmxnZW4uQ0xJUFMuQzMifQ%3D%3D&_nc_ohc=HVabN2FWD9oQ7kNvwFM9FBh&_nc_oc=AdoP2Bf2hCiK3OAEETclYPi9L9VgUDxABn71tcLNI0MORMe1y1HOucbGZiNFCAABwHgqnL4umtwQvnzhrNFuOo1c&_nc_zt=23&_nc_ht=scontent-tpe1-1.cdninstagram.com&edm=ANo9K5cEAAAA&_nc_gid=QtKzGqASPYGF0NL_5VfPVA&_nc_tpa=Q5bMBQLk8FizTLNX151tK6mV209F174oTBZUa2rPNQc4Hn82y_MIhwf4FvvS5LLXgF8eSfd7z28Gxuvjrg&oh=00_AQOm2l9bXA6nStQi0kisLsse273EDDqCS5zrbE2spawy_A&oe=6AC085D9'
+      );
+      setError(null);
+    }
+  }, [isOpen, currentAuto]);
+
+  if (!isOpen) return null;
 
   const fallbackPosts = [
     {
@@ -132,7 +151,7 @@ export const CreateAutomationModal: React.FC<CreateAutomationModalProps> = ({
                 {editAutomation ? 'Edit Automation Rule' : 'Create New Automation'}
               </h2>
               <p className="text-xs text-slate-500">
-                Detect comment keywords on Instagram and dispatch instant DMs
+                Trigger instant DMs for comments on <strong className="text-slate-800">@{currentHandle}</strong>
               </p>
             </div>
           </div>

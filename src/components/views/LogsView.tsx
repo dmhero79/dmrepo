@@ -7,11 +7,44 @@ interface LogsViewProps {
   onRefresh: () => void;
 }
 
-export const LogsView: React.FC<LogsViewProps> = ({ logs, onRefresh }) => {
+export const LogsView: React.FC<LogsViewProps> = ({ logs: initialLogs, onRefresh }) => {
   const [filterLevel, setFilterLevel] = useState<'ALL' | 'SUCCESS' | 'INFO' | 'WARN' | 'ERROR'>('ALL');
   const [search, setSearch] = useState('');
+  const [serverLogs, setServerLogs] = useState<any[]>([]);
 
-  const filtered = logs.filter((log) => {
+  React.useEffect(() => {
+    async function loadServerLogs() {
+      try {
+        const res = await fetch('/api/webhook/logs');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs)) {
+          setServerLogs(data.logs);
+        }
+      } catch (err) {
+        console.warn('Could not fetch server logs:', err);
+      }
+    }
+    loadServerLogs();
+    const interval = setInterval(loadServerLogs, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Merge server webhook logs with app logs
+  const combinedLogs: LogEntry[] = [
+    ...serverLogs.map((s) => ({
+      id: s.id,
+      timestamp: s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : 'Just now',
+      level: (s.status === 'delivered' ? 'SUCCESS' : s.status === 'failed' ? 'ERROR' : 'INFO') as 'SUCCESS' | 'ERROR' | 'INFO',
+      event: s.type === 'comment' ? 'Comment Webhook Received' : 'Direct Message Delivered',
+      postCode: s.mediaId || '#DbTt-X3yduU',
+      userHandle: s.senderUsername ? `@${s.senderUsername}` : '@mridaliniofficial',
+      details: s.actionTaken || s.text || 'Webhook payload processed',
+      latency: '240ms',
+    })),
+    ...initialLogs,
+  ];
+
+  const filtered = combinedLogs.filter((log) => {
     const matchesLevel = filterLevel === 'ALL' || log.level === filterLevel;
     const matchesSearch =
       !search ||

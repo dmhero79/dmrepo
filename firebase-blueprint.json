@@ -1,13 +1,108 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Platform user account record",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth user UID",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 150
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name",
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar URL",
+          "maxLength": 500
+        },
+        "plan": {
+          "type": "string",
+          "description": "Subscription plan",
+          "enum": ["free_starter", "creator_pro"]
+        },
+        "activeAccountId": {
+          "type": "string",
+          "description": "Currently active Instagram account ID",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["uid", "plan", "createdAt"]
+    },
+    "UserInstagramAccount": {
+      "title": "User Instagram Account",
+      "description": "Connected Instagram business or creator profile for a platform user",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique account ID",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID",
+          "maxLength": 128
+        },
+        "handle": {
+          "type": "string",
+          "description": "Instagram handle without @",
+          "maxLength": 50
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name or brand title",
+          "maxLength": 100
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "Profile picture URL",
+          "maxLength": 500
+        },
+        "isConnected": {
+          "type": "boolean",
+          "description": "Whether Graph API is connected"
+        },
+        "connectedAt": {
+          "type": "string",
+          "description": "Timestamp connected",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "userId", "handle", "displayName", "isConnected", "connectedAt"]
+    },
     "AutomationRule": {
       "title": "Automation Rule",
-      "description": "Auto-DM keyword automation rule",
+      "description": "Auto-DM keyword automation rule for user's account",
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique rule identifier",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID",
+          "maxLength": 128
+        },
+        "accountId": {
+          "type": "string",
+          "description": "Target Instagram account handle or ID",
           "maxLength": 128
         },
         "name": {
@@ -112,9 +207,17 @@
     }
   },
   "firestore": {
-    "/automations/{ruleId}": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile in platform"
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": "UserInstagramAccount",
+      "description": "Connected Instagram accounts owned by user"
+    },
+    "/users/{userId}/automations/{ruleId}": {
       "schema": "AutomationRule",
-      "description": "Active keyword automation rules"
+      "description": "Auto-DM rules owned by user"
     },
     "/webhookLogs/{logId}": {
       "schema": "WebhookLog",
