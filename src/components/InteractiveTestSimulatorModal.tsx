@@ -28,8 +28,8 @@ export const InteractiveTestSimulatorModal: React.FC<InteractiveTestSimulatorMod
   onTriggerSimulatedActivity,
 }) => {
   const [selectedChannel, setSelectedChannel] = useState<ChannelType>('instagram');
-  const [commentInput, setCommentInput] = useState('Hey Ankit, can you send the course link please?');
-  const [userHandle, setUserHandle] = useState('@demo_tester');
+  const [commentInput, setCommentInput] = useState('BUY please! Where can I get this outfit?');
+  const [userHandle, setUserHandle] = useState('@priya_style');
   const [simulationState, setSimulationState] = useState<'idle' | 'processing' | 'success' | 'no_match'>('idle');
   const [matchedRule, setMatchedRule] = useState<Automation | null>(null);
 

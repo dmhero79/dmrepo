@@ -7,7 +7,7 @@ const db = admin.firestore();
 
 // Config from environment
 const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN || 'autodm_meta_verify_token_2026';
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || '';
+const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || 'IGAAPl048uu5RBZAFp4VlJ1N2NpQW13OTR3cEFUMDVOQlNMZAWdhV2kwRkVpVGVaUk5VZATJ1SzlsUnFyVzJkeGdDY0hQdHZASQnhiaDY2aENlZAzRtS2FIZA3k4TzFSWFZACdDJBQnRWX2xZAN1RGanduUS1NVjZAlVC1vTkxjeDdPZAUhGRQZDZD';
 
 /**
  * Health check endpoint

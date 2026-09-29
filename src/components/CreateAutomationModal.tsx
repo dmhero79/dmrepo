@@ -35,23 +35,53 @@ export const CreateAutomationModal: React.FC<CreateAutomationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const samplePosts = [
+  const [livePosts, setLivePosts] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    async function loadPosts() {
+      try {
+        const res = await fetch('/api/instagram/posts');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.posts) && data.posts.length > 0) {
+          setLivePosts(data.posts);
+        }
+      } catch (err) {
+        console.warn('Could not load live posts:', err);
+      }
+    }
+    loadPosts();
+  }, []);
+
+  const fallbackPosts = [
     {
-      code: '#cKcJ39',
-      title: 'Course Launch: Creator Masterclass 2026',
-      thumbnail: '/src/assets/images/post_course_launch_1790498703738.jpg',
+      code: 'DbTt-X3yduU',
+      title: 'Reel: Festive Launch & Styling',
+      thumbnail: 'https://scontent-tpe1-1.cdninstagram.com/v/t51.71878-15/758400594_1074641168558022_1484593028835977962_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=106&ccb=7-5&_nc_sid=a54f6b&efg=eyJlZmdfdGFnIjoiYmVzdF9pbWFnZV91cmxnZW4uQ0xJUFMuQzMifQ%3D%3D&_nc_ohc=HVabN2FWD9oQ7kNvwFM9FBh&_nc_oc=AdoP2Bf2hCiK3OAEETclYPi9L9VgUDxABn71tcLNI0MORMe1y1HOucbGZiNFCAABwHgqnL4umtwQvnzhrNFuOo1c&_nc_zt=23&_nc_ht=scontent-tpe1-1.cdninstagram.com&edm=ANo9K5cEAAAA&_nc_gid=QtKzGqASPYGF0NL_5VfPVA&_nc_tpa=Q5bMBQLk8FizTLNX151tK6mV209F174oTBZUa2rPNQc4Hn82y_MIhwf4FvvS5LLXgF8eSfd7z28Gxuvjrg&oh=00_AQOm2l9bXA6nStQi0kisLsse273EDDqCS5zrbE2spawy_A&oe=6AC085D9',
     },
     {
-      code: '#B7eX4a',
-      title: 'Product Info: Acoustic Studio Pro Wireless',
-      thumbnail: '/src/assets/images/post_product_headphones_1790498714259.jpg',
+      code: 'DbTyxNbSlNJ',
+      title: 'Post: Handcrafted Pure Silk Anarkali',
+      thumbnail: 'https://scontent-tpe1-1.cdninstagram.com/v/t51.82787-15/759408922_18203433670329609_4651465586871677850_n.webp?stp=dst-jpg_e35_tt6&_nc_cat=105&ig_cache_key=Mzk1MDcyNDU4MjEzMDQ3MTc1Mw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=a54f6b&efg=eyJlZmdfdGFnIjoiYmVzdF9pbWFnZV91cmxnZW4uRkVFRC5DMyJ9&_nc_ohc=8mFyUENJVCIQ7kNvwE2AhgJ&_nc_oc=AdqW_pUytybg9Kdo_sowbA97rdt6Uyn2a23woREP0K-sBhhV7XC3cSKE87waGrLdV3_vlfaigdjus9r1CQfjtul5&_nc_zt=23&_nc_ht=scontent-tpe1-1.cdninstagram.com&edm=ANo9K5cEAAAA&_nc_gid=QtKzGqASPYGF0NL_5VfPVA&_nc_tpa=Q5bMBQK_gVaz89JQXX5TPHjjcC5CtJIOIWI5v0q1mk8EvzELJTIGJvLvKTPUkGGeGAhCVX291OOaXdoWdA&oh=00_AQMfDU3Gh7HFfLZsBYxxfOeqis05_FN3boTb2jfsp2pC7Q&oe=6AC09EEF',
     },
     {
-      code: '#T9h2Lp',
-      title: 'Travel Deals: Mediterranean Retreats',
-      thumbnail: '/src/assets/images/post_travel_deals_1790498725783.jpg',
+      code: 'DbTxR2oSIp9',
+      title: 'Post: Zari Bordered Tissue Stole',
+      thumbnail: 'https://scontent-tpe1-1.cdninstagram.com/v/t51.82787-15/757954711_18203430457329609_9017753783645031254_n.webp?stp=dst-jpg_e35_tt6&_nc_cat=107&ig_cache_key=Mzk1MDcxODAyOTMwMjEwNjc0OQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=a54f6b&efg=eyJlZmdfdGFnIjoiYmVzdF9pbWFnZV91cmxnZW4uRkVFRC5DMyJ9&_nc_ohc=PZ6JxjyCOIMQ7kNvwHbKImY&_nc_oc=AdpSGnm8N4gVVfSvCXbvfKwmwbxhOjGOc2qgOAgYnn_owlaExFMNwlXy5en-mbZi48_4ZqJBbJmwkjmFHsDDYivD&_nc_zt=23&_nc_ht=scontent-tpe1-1.cdninstagram.com&edm=ANo9K5cEAAAA&_nc_gid=QtKzGqASPYGF0NL_5VfPVA&_nc_tpa=Q5bMBQLVIucMKNhf8xc_F5Fu2KB2nB03DdoJK_3-twvUMmmQ7zUH7TSdusD1BfBP4a-etgVkOo1sqLqJYw&oh=00_AQOzXGrS1hjbNVT5gMe3FChLf42tCl9_7-cb6vY-qFRapg&oe=6AC07DC2',
+    },
+    {
+      code: 'DbTxOh8SMnz',
+      title: 'Post: Royal Velvet Kurta',
+      thumbnail: 'https://scontent-tpe1-1.cdninstagram.com/v/t51.82787-15/757656953_18203430388329609_9134546905843078551_n.webp?stp=dst-jpg_e35_tt6&_nc_cat=104&ig_cache_key=Mzk1MDcxNzgwMDkzMDY1ODgwMw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=a54f6b&efg=eyJlZmdfdGFnIjoiYmVzdF9pbWFnZV91cmxnZW4uRkVFRC5DMyJ9&_nc_ohc=CRNZ2vILwuEQ7kNvwHRJ_l0&_nc_oc=AdpNcvdy2FYqE4umgbP-8OKwPs4K91RLfF3tWkwXxBKJLxyo7J86xKlKAnMif66U5V5nvWxy6RtbV-5g3eTcLLZ8&_nc_zt=23&_nc_ht=scontent-tpe1-1.cdninstagram.com&edm=ANo9K5cEAAAA&_nc_gid=QtKzGqASPYGF0NL_5VfPVA&_nc_tpa=Q5bMBQJmKoW59rIXiSaQKgNT-sPQnQykOcBq9r9zOVTfUmCsZfzCb2G63r0f_DkPRv6Ll9eaRKn1TeRc5Q&oh=00_AQMdvwRmPptAYXpL-ulnmS89xl0zOifJehi8Zgx3daUulw&oe=6AC087BC',
     },
   ];
+
+  const samplePosts = livePosts.length > 0 
+    ? livePosts.map(p => ({
+        code: p.permalink ? p.permalink.split('/p/')[1]?.replace('/', '') || p.permalink.split('/reel/')[1]?.replace('/', '') || p.id : p.id,
+        title: p.caption ? (p.caption.slice(0, 45) + '...') : (p.media_type === 'VIDEO' ? 'Instagram Reel' : 'Instagram Post'),
+        thumbnail: p.thumbnail_url || p.media_url,
+      }))
+    : fallbackPosts;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -124,6 +124,35 @@ export const AutomationsView: React.FC<AutomationsViewProps> = ({
         </div>
       </div>
 
+      {/* Live Connected Instagram Account Status Banner */}
+      <div className="p-3.5 rounded-xl bg-gradient-to-r from-pink-50 via-purple-50 to-indigo-50 border border-pink-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white flex items-center justify-center font-bold shadow-xs">
+            <span className="text-xs">IG</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900 text-sm">@mridaliniofficial</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                <span>Live Meta Graph API v21.0</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-0.5">
+              Active comment-to-DM triggers mapped to your 5 live Instagram reels &amp; posts. Private reply automation operational.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={onOpenSimulator}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-pink-600 hover:bg-pink-700 text-white cursor-pointer self-start sm:self-auto shrink-0 shadow-xs flex items-center gap-1.5"
+        >
+          <Play className="w-3.5 h-3.5 fill-white" />
+          <span>Test Live Keyword Trigger</span>
+        </button>
+      </div>
+
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">

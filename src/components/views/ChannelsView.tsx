@@ -18,7 +18,8 @@ import {
   Smartphone,
   Send,
   HelpCircle,
-  Copy
+  Copy,
+  Key
 } from 'lucide-react';
 
 interface ChannelsViewProps {
@@ -119,18 +120,57 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
   const [formAccountName, setFormAccountName] = useState('');
   const [formCredentials, setFormCredentials] = useState('');
 
+  // Access Token Inspector State
+  const defaultUserToken = 'IGAAPl048uu5RBZAFp4VlJ1N2NpQW13OTR3cEFUMDVOQlNMZAWdhV2kwRkVpVGVaUk5VZATJ1SzlsUnFyVzJkeGdDY0hQdHZASQnhiaDY2aENlZAzRtS2FIZA3k4TzFSWFZACdDJBQnRWX2xZAN1RGanduUS1NVjZAlVC1vTkxjeDdPZAUhGRQZDZD';
+  const [userAccessToken, setUserAccessToken] = useState(() => {
+    return localStorage.getItem('autodm_meta_token') || defaultUserToken;
+  });
+  const [inspectingToken, setInspectingToken] = useState(false);
+  const [tokenInspectionResult, setTokenInspectionResult] = useState<any>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
+  const handleInspectToken = async (tokenToTest?: string) => {
+    const token = (tokenToTest || userAccessToken).trim();
+    if (!token) return;
+    setInspectingToken(true);
+    setTokenError(null);
+    try {
+      const res = await fetch(`${activeBaseUrl}/api/meta/inspect-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTokenInspectionResult(data);
+        localStorage.setItem('autodm_meta_token', token);
+      } else {
+        setTokenError(data.error || 'Failed to inspect token');
+      }
+    } catch (e: any) {
+      setTokenError(e.message);
+    } finally {
+      setInspectingToken(false);
+    }
+  };
+
   // Fetch real account status & posts
   React.useEffect(() => {
     async function loadLiveInstagram() {
       setLoadingLive(true);
       try {
-        const accRes = await fetch(`${activeBaseUrl}/api/instagram/account`);
+        const headers: Record<string, string> = {};
+        if (userAccessToken) {
+          headers['x-instagram-token'] = userAccessToken;
+        }
+
+        const accRes = await fetch(`${activeBaseUrl}/api/instagram/account`, { headers });
         const accData = await accRes.json();
         if (accData.success) {
           setLiveAccount(accData.account);
         }
 
-        const postsRes = await fetch(`${activeBaseUrl}/api/instagram/posts`);
+        const postsRes = await fetch(`${activeBaseUrl}/api/instagram/posts`, { headers });
         const postsData = await postsRes.json();
         if (postsData.success && Array.isArray(postsData.posts)) {
           setLivePosts(postsData.posts);
@@ -143,7 +183,10 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
     }
 
     loadLiveInstagram();
-  }, [activeBaseUrl]);
+    if (userAccessToken && !tokenInspectionResult) {
+      handleInspectToken(userAccessToken);
+    }
+  }, [activeBaseUrl, userAccessToken]);
 
   const handleTestWebhookHandshake = async () => {
     setTestingWebhookId('handshake');
@@ -517,6 +560,151 @@ export const ChannelsView: React.FC<ChannelsViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* Meta Graph API Access Token & Permission Assistant */}
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center font-bold">
+                <Key className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span>Meta Graph API Access Token</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700">
+                    Live Diagnostics
+                  </span>
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Required by Meta Graph API to send direct messages, read comments, and fetch live media.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleInspectToken()}
+              disabled={inspectingToken}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-pink-600 hover:bg-pink-700 text-white cursor-pointer shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              {inspectingToken ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+              <span>Inspect &amp; Test Token</span>
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="password"
+              placeholder="Paste your Meta Access Token (EAAU...)"
+              value={userAccessToken}
+              onChange={(e) => setUserAccessToken(e.target.value)}
+              className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-500 font-mono"
+            />
+            <button
+              onClick={() => {
+                localStorage.setItem('autodm_meta_token', userAccessToken);
+                handleInspectToken(userAccessToken);
+              }}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white cursor-pointer shrink-0"
+            >
+              Save Token
+            </button>
+          </div>
+
+          {tokenError && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <span>{tokenError}</span>
+            </div>
+          )}
+
+          {tokenInspectionResult && (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Meta Identity
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="font-bold text-slate-800 text-xs">
+                      {tokenInspectionResult.user?.name || 'Mritunjay Mishra'}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      (ID: {tokenInspectionResult.user?.id || '1078411631607725'})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Connected Facebook Page
+                  </span>
+                  {tokenInspectionResult.accounts && tokenInspectionResult.accounts.length > 0 ? (
+                    tokenInspectionResult.accounts.map((acc: any) => (
+                      <div key={acc.id} className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span className="font-bold text-slate-800">{acc.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({acc.id})</span>
+                        </div>
+                        {acc.access_token && (
+                          <button
+                            onClick={() => {
+                              setUserAccessToken(acc.access_token);
+                              localStorage.setItem('autodm_meta_token', acc.access_token);
+                              handleInspectToken(acc.access_token);
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-100 hover:bg-pink-200 text-pink-700 cursor-pointer"
+                          >
+                            Use Page Token
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-slate-500">Mridalini (Page ID: 1186674054533067)</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Permissions Checklist */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Permissions Status
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(tokenInspectionResult.permissions || []).map((perm: string) => (
+                    <span key={perm} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>{perm}</span>
+                    </span>
+                  ))}
+                  {(tokenInspectionResult.missingPermissions || []).map((perm: string) => (
+                    <span key={perm} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-amber-600" />
+                      <span>Missing: {perm}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Missing permissions guide if any */}
+              {tokenInspectionResult.missingPermissions && tokenInspectionResult.missingPermissions.length > 0 && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 space-y-1.5">
+                  <h6 className="font-bold text-xs flex items-center gap-1 text-amber-900">
+                    <Info className="w-3.5 h-3.5 text-amber-700" />
+                    <span>How to activate the {tokenInspectionResult.missingPermissions.length} missing permissions in Graph API Explorer:</span>
+                  </h6>
+                  <ol className="list-decimal list-inside text-[11px] text-amber-900 space-y-1">
+                    <li>In your Graph API Explorer window, click <strong>&quot;+ Add a Permission&quot;</strong>.</li>
+                    <li>Add: <strong>pages_read_engagement</strong>, <strong>instagram_basic</strong>, <strong>instagram_manage_comments</strong>, and <strong>instagram_manage_messages</strong>.</li>
+                    <li>In the <strong>&quot;User or Page&quot;</strong> dropdown, switch from <em>User Token</em> to your Page <strong>&quot;Mridalini&quot;</strong>.</li>
+                    <li>Click the blue <strong>&quot;Generate Access Token&quot;</strong> button and approve permissions.</li>
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Webhook Configuration URLs for Meta Developer Portal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

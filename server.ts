@@ -13,11 +13,19 @@ const PORT = Number(process.env.PORT) || 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
 // Instagram / Meta Credentials (loaded securely from environment variables)
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '';
+let runtimeAccessToken = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || 'IGAAPl048uu5RBZAFp4VlJ1N2NpQW13OTR3cEFUMDVOQlNMZAWdhV2kwRkVpVGVaUk5VZATJ1SzlsUnFyVzJkeGdDY0hQdHZASQnhiaDY2aENlZAzRtS2FIZA3k4TzFSWFZACdDJBQnRWX2xZAN1RGanduUS1NVjZAlVC1vTkxjeDdPZAUhGRQZDZD';
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || '';
 const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN || 'autodm_meta_verify_token_2026';
 const INSTAGRAM_WEBHOOK_VERIFY_TOKEN = WEBHOOK_VERIFY_TOKEN;
+
+const getEffectiveToken = (req: Request) => {
+  const headerToken = (req.headers['x-instagram-token'] as string) || '';
+  if (headerToken.trim()) return headerToken.trim();
+  const queryToken = (req.query.access_token as string) || '';
+  if (queryToken.trim()) return queryToken.trim();
+  return runtimeAccessToken;
+};
 
 // In-memory logs of real and simulated webhook events and DM dispatches
 interface WebhookEventLog {
@@ -116,9 +124,13 @@ app.get('/health', (req: Request, res: Response) => {
 // 1. INSTAGRAM GRAPH API STATUS & ACCOUNT ENDPOINT
 // ==============================================================
 app.get('/api/instagram/account', async (req: Request, res: Response) => {
+  const token = getEffectiveToken(req);
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'No Instagram access token provided' });
+  }
   try {
     const response = await fetch(
-      `https://graph.instagram.com/v21.0/me?fields=id,username,account_type,media_count,profile_picture_url&access_token=${INSTAGRAM_ACCESS_TOKEN}`
+      `https://graph.instagram.com/v21.0/me?fields=id,username,account_type,media_count,profile_picture_url&access_token=${token}`
     );
     const data = await response.json();
 
@@ -153,9 +165,13 @@ app.get('/api/instagram/account', async (req: Request, res: Response) => {
 // 2. FETCH REAL INSTAGRAM POSTS & REELS
 // ==============================================================
 app.get('/api/instagram/posts', async (req: Request, res: Response) => {
+  const token = getEffectiveToken(req);
+  if (!token) {
+    return res.json({ success: true, posts: [] });
+  }
   try {
     const response = await fetch(
-      `https://graph.instagram.com/v21.0/me/media?fields=id,caption,media_type,permalink,thumbnail_url,media_url,timestamp,comments_count,like_count&limit=10&access_token=${INSTAGRAM_ACCESS_TOKEN}`
+      `https://graph.instagram.com/v21.0/me/media?fields=id,caption,media_type,permalink,thumbnail_url,media_url,timestamp,comments_count,like_count&limit=10&access_token=${token}`
     );
     const data = await response.json();
 
@@ -173,9 +189,124 @@ app.get('/api/instagram/posts', async (req: Request, res: Response) => {
 });
 
 // ==============================================================
+// 2B. INSPECT META / FACEBOOK ACCESS TOKEN
+// ==============================================================
+app.post('/api/meta/inspect-token', async (req: Request, res: Response) => {
+  const token = (req.body?.token || getEffectiveToken(req)).trim();
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'Token is required' });
+  }
+
+  try {
+    // 0. Handle Instagram Graph API Token (IGAA...)
+    if (token.startsWith('IGAA')) {
+      const igRes = await fetch(
+        `https://graph.instagram.com/v21.0/me?fields=id,username,account_type,media_count,profile_picture_url&access_token=${token}`
+      );
+      const igData = await igRes.json();
+      if (igData.error) {
+        return res.status(400).json({ success: false, error: igData.error.message, details: igData.error });
+      }
+
+      return res.json({
+        success: true,
+        tokenType: 'instagram_direct',
+        user: {
+          name: igData.username,
+          id: igData.id,
+        },
+        account: {
+          id: igData.id,
+          username: igData.username,
+          accountType: igData.account_type,
+          mediaCount: igData.media_count,
+          profilePictureUrl: igData.profile_picture_url,
+        },
+        permissions: [
+          'instagram_basic',
+          'instagram_manage_comments',
+          'instagram_manage_messages',
+          'pages_read_engagement',
+        ],
+        missingPermissions: [],
+        accounts: [{
+          name: `@${igData.username}`,
+          id: igData.id,
+          access_token: token,
+          accountType: igData.account_type,
+        }],
+        isFullyAuthorized: true,
+      });
+    }
+
+    // 1. Get User Profile via Facebook Graph API
+    const meRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${token}`);
+    const meData = await meRes.json();
+    if (meData.error) {
+      return res.status(400).json({ success: false, error: meData.error.message, details: meData.error });
+    }
+
+    // 2. Get Permissions
+    let permissions: string[] = [];
+    try {
+      const permRes = await fetch(`https://graph.facebook.com/v21.0/me/permissions?access_token=${token}`);
+      const permData = await permRes.json();
+      if (Array.isArray(permData.data)) {
+        permissions = permData.data.filter((p: any) => p.status === 'granted').map((p: any) => p.permission);
+      }
+    } catch {}
+
+    // 3. Get Pages & Connected Instagram Accounts
+    let accounts: any[] = [];
+    try {
+      const accRes = await fetch(
+        `https://graph.facebook.com/v21.0/me/accounts?fields=name,id,access_token,instagram_business_account{id,username}&access_token=${token}`
+      );
+      const accData = await accRes.json();
+      if (Array.isArray(accData.data)) {
+        accounts = accData.data;
+      }
+    } catch {}
+
+    const requiredPermissions = [
+      'pages_read_engagement',
+      'instagram_basic',
+      'instagram_manage_comments',
+      'instagram_manage_messages',
+      'pages_messaging',
+      'pages_show_list',
+    ];
+
+    const missingPermissions = requiredPermissions.filter((p) => !permissions.includes(p));
+
+    return res.json({
+      success: true,
+      user: meData,
+      permissions,
+      missingPermissions,
+      accounts,
+      isFullyAuthorized: missingPermissions.length === 0,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Save token in memory
+app.post('/api/meta/save-token', (req: Request, res: Response) => {
+  const { token } = req.body;
+  if (!token || !token.trim()) {
+    return res.status(400).json({ success: false, error: 'Token is required' });
+  }
+  runtimeAccessToken = token.trim();
+  return res.json({ success: true, message: 'Access token saved successfully' });
+});
+
+// ==============================================================
 // 3. SEND DIRECT MESSAGE OR PRIVATE REPLY VIA INSTAGRAM GRAPH API
 // ==============================================================
 app.post('/api/instagram/send-dm', async (req: Request, res: Response) => {
+  const token = getEffectiveToken(req);
   const { recipientId, commentId, messageText } = req.body;
 
   if (!messageText) {
@@ -198,7 +329,7 @@ app.post('/api/instagram/send-dm', async (req: Request, res: Response) => {
 
   try {
     const response = await fetch(
-      `https://graph.instagram.com/v21.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`,
+      `https://graph.instagram.com/v21.0/me/messages?access_token=${token}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -329,7 +460,7 @@ const handleWebhookEvent = async (req: Request, res: Response) => {
                 try {
                   // Fire private reply DM to commenter
                   const sendRes = await fetch(
-                    `https://graph.instagram.com/v21.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`,
+                    `https://graph.instagram.com/v21.0/me/messages?access_token=${runtimeAccessToken}`,
                     {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -381,7 +512,7 @@ const handleWebhookEvent = async (req: Request, res: Response) => {
             if (matchedRule && senderId) {
               try {
                 const sendRes = await fetch(
-                  `https://graph.instagram.com/v21.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`,
+                  `https://graph.instagram.com/v21.0/me/messages?access_token=${runtimeAccessToken}`,
                   {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
