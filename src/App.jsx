@@ -115,7 +115,11 @@ export default function App() {
       await setDoc(userRef, userData, { merge: true });
     } catch (err) {
       console.error('Sign in failed:', err);
-      setError(err.message || 'Authentication error occurred');
+      if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+        setError(`Domain Unauthorized: "${window.location.hostname}" is not in your Firebase Authorized Domains. Add it in Firebase Console -> Authentication -> Settings -> Authorized Domains.`);
+      } else {
+        setError(err.message || 'Authentication error occurred');
+      }
     }
   };
 
